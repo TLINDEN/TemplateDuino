@@ -48,7 +48,8 @@ The page template index.tpl will then look like this:
 </ul>
 <% endblock content %>
 
-``
+```
+
 
 Here we define, that the index.tpl template is using base.tpl as its base.
 
