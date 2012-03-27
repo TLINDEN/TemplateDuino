@@ -78,7 +78,7 @@ and add the following code to your sketch to use it:
 #include "WebServer.h"
 
 struct DATA_index {
-  float humidity;
+`  float humidity;
   float temp;
 };
 
