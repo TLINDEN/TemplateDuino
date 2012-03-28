@@ -60,6 +60,66 @@ Also we are using some variables here, eg: <% float temp %>. The float keyword i
 mandatory and tells the compiler the variable type. So use here whatever you are
 using in your sketch (and the compiler accepts).
 
+
+#### Loops
+
+You can also generate loops to display list of data or to create a selection
+in a form. In a template you write:
+
+```
+<% for pin in PinList pins %>
+  <li><% String pin.name %>: <% int pin.value %></li>
+<% endfor %>
+```
+
+And in your code you add the data structures required for this like so:
+
+```
+struct DATA_PinList {
+  String name;
+  int value;
+  int pin;
+};
+
+struct DATA_list {
+  DATA_PinList pins[3];
+};
+
+DATA_PinList button1;
+DATA_PinList button2;
+DATA_PinList button3;
+
+DATA_list buttonlist;
+
+void setup() {
+  button1.name = "Left Button";
+  button1.pin  = 10;
+  button2.name = "Middle Button";
+  button2.pin  = 11;
+  button3.name = "Right Button";
+  button3.pin  = 12;
+  
+  buttonlist.pins[0] = button1;
+  buttonlist.pins[1] = button2;
+  buttonlist.pins[2] = button3;
+  
+  for (int i=0; i<3; i++) {
+     pinMode(buttonlist.pins[i].pin, INPUT);
+  }
+}
+```
+
+And in the webduino handler:
+
+```
+    for (int i=0; i<3; i++) {
+      buttonlist.pins[i].value = digitalRead(buttonlist.pins[i].pin);
+    }
+    tpl_list(server, buttonlist);
+```
+
+The example sketch contains a working loop template and code.
+
 ### Code Generation
 
 Next, execute the script with the directory containing the templates as a parameter:
@@ -79,7 +139,7 @@ and add the following code to your sketch to use it:
 #include "WebServer.h"
 
 struct DATA_index {
-`  float humidity;
+  float humidity;
   float temp;
 };
 
@@ -127,3 +187,13 @@ is implemented but not documented yet.
 ### Author
 
 T.Linden
+
+### Version
+
+TemplateDuino Version 0.01
+
+### License and Copyright
+
+Licensed under the terms of the perl artistic license.
+
+Copyright (c) 2012 T.Linden

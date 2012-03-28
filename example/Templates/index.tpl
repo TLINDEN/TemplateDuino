@@ -6,11 +6,7 @@ Temperatur
 
 <% block content %>
 <ul>
-  <li>Temperatur: <% float temp %>&deg; C</li>
-  <li>Luftfeuchte: <% float humidity %>%</li>
+<li>Temperatur: <% float temp %>&deg; C</li>
+<li>Luftfeuchte: <% float humidity %>%</li>
 </ul>
 <% endblock content %>
-
-
-
-

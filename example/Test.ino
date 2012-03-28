@@ -1,3 +1,10 @@
+#include <Wire.h>
+#include "RTClib.h"
+
+RTC_DS1307 RTC;
+
+#include <EEPROM.h>
+#include "EEany.h"
 
 #define WEBDUINO_FAIL_MESSAGE "<h1>Request Failed</h1>"
 #include "SPI.h" // new include
@@ -6,163 +13,124 @@
 #include "WebServer.h"
 
 
+#define PREFIX ""
+WebServer webserver(PREFIX, 80);
+
 struct DATA_index {
-  float temp;
-  float humidity;
+  int date;
 };
 
+char endl = '\n';
 
+// no-cost stream operator as described at
+// http://sundial.org/arduino/?page_id=119
 template<class T>
 inline Print &operator <<(Print &obj, T arg) { obj.print(arg); return obj; }
-
-char endl = '\n';
 
 #include "Templates.h"
 
 
 
 
-#include "DHT.h"
 
-#define DHTPIN 8
-#define DHTTYPE DHT22
+int maxchannels = 8;
+int maxprograms = 32;
+int dbversion   = 1000;
 
-#define VERSION_STRING "0.1"
+int tastled = 40;
+int taster = 7;
+int relais = 37;
 
-/* CHANGE THIS TO YOUR OWN UNIQUE VALUE.  The MAC number should be
- * different from any other devices on your network or you'll have
- * problems receiving packets. */
-static uint8_t mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
+int status = 0;
+int prev   = 0;
 
+Database db;
 
-/* CHANGE THIS TO MATCH YOUR HOST NETWORK.  Most home networks are in
- * the 192.168.0.XXX or 192.168.1.XXX subrange.  Pick an address
- * that's not in use and isn't going to be automatically allocated by
- * DHCP from your router. */
-static uint8_t ip[] = { 10, 0, 0, 2 };
+void setup() { 
+  pinMode(tastled, OUTPUT);
+  pinMode(relais, OUTPUT);
+  pinMode(taster, INPUT);
+  Wire.begin();
+  RTC.begin();
 
+  Serial.begin(9600);
+  
+  if (! RTC.isrunning()) {
+    Serial.println("RTC is NOT running!");
+    // following line sets the RTC to the date & time this sketch was compiled
+    RTC.adjust(DateTime(__DATE__, __TIME__));
+  }
+  
+  db = ee_getdb();
+}
 
+void prstatus(int old, int cur) {
+  if(old != cur) {
+    if(cur) {
+     digitalWrite(tastled, HIGH);
+     Serial.println("Taste: EIN");
+     digitalWrite(relais, LOW);
+     Serial.println("  Relais ON ");
+    }
+    else {
+     digitalWrite(tastled, LOW);
+     Serial.println("Taste: AUS");
+     digitalWrite(relais, HIGH);
+     Serial.println("  Relais OFF");
+    }
+    prev = status;
+  }
+}
 
-int all[] = {31, 33, 35};
-int prog = 0;
-
-float temperature;
-float humidity;
-
-DHT dht(DHTPIN, DHTTYPE);
-
-/* This creates an instance of the webserver.  By specifying a prefix
- * of "", all pages will be at the root of the server. */
-#define PREFIX ""
-WebServer webserver(PREFIX, 80);
-
-void getSensorData() {
-  // Reading temperature or humidity takes about 250 milliseconds!
-  // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
-  float h = dht.readHumidity();
-  float t = dht.readTemperature();
-
-  // check if returns are valid, if they are NaN (not a number) then something went wrong!
-  if (isnan(t) || isnan(h)) {
-    Serial.println("Failed to read from DHT");
+bool chan_by_prog_on(DateTime now, int chan) {
+  /*
+   * check if the current time is between programmed
+   * turn-on-time. Mode Manual.
+   *
+   * FIXME: add checking for 0 values
+   */
+  int nowmin   = ((int) now.hour() * 60) + (int) now.minute();
+  int startmin = (db.programs[chan].start_hour * 60) + db.programs[chan].start_min;
+  int stopmin  = (db.programs[chan].stop_hour * 60)  + (db.programs[chan].stop_min ? db.programs[chan].stop_min - 1 : 0);
+  if(startmin <= nowmin && stopmin >= nowmin) {
+    return true;
   }
   else {
-     temperature = t;
-     humidity    = h;
+    return false;
   }
 }
 
-void ledprog() {
-  switch (prog) {
+void printdate(DateTime now) {
+    Serial.print(now.year(), DEC);
+    Serial.print('/');
+    Serial.print(now.month(), DEC);
+    Serial.print('/');
+    Serial.print(now.day(), DEC);
+    Serial.print(' ');
+    Serial.print(now.hour(), DEC);
+    Serial.print(':');
+    Serial.print(now.minute(), DEC);
+    Serial.print(':');
+    Serial.print(now.second(), DEC);
+    Serial.println();
+}
 
-  case 0:
-    for (int i = 0; i<3; i++) {
-     digitalWrite( all[i], HIGH);
-     delay(100);
-     digitalWrite( all[i], LOW);
-    }
-    break;  
+void checkprog() {
+ DateTime now = RTC.now();
  
-  case 1:
-    for (int i = 0; i<3; i++) {
-     digitalWrite( all[i], HIGH);
-    }
-
-    delay(300);
-
-    for (int i = 0; i<3; i++) {
-     digitalWrite( all[i], LOW);
-    }    
-   
-    delay(100);
-    break;
-    
-  case 2:
-    for (int i=0; i<4; i++) {
-       for(int n=0; n<5; n++) {
-         digitalWrite(all[i], HIGH);
-         delay(100);
-         digitalWrite(all[i], LOW);
-         delay(100);
-       }
-       delay(100);
-    }
-    break;
-  }
-  delay(300);
-}
-
-
-
-
-
-void tempCmd(WebServer &server, WebServer::ConnectionType type, char *, bool) {
-  if (type == WebServer::POST)  {
-    server.httpSeeOther("PREFIX");
-    return;
-  }
-
-  server.httpSuccess();
-
-  if (type == WebServer::GET) {
-    getSensorData();
-    DATA_index data;
-    data.temp = temperature;
-    data.humidity = humidity;
-    tpl_index(server, data);
-  }
-}
-
-void setup() {
-  /* initialize the Ethernet adapter */
-  Ethernet.begin(mac, ip);
-
-  /* setup our default command that will be run when the user accesses
-   * the root page on the server */
-  webserver.setDefaultCommand(&tempCmd);
-
-  /* start the webserver */
-  webserver.begin();
-  
-  for (int i = 0; i<3; i++) {
-     pinMode( all[i], OUTPUT);
-  }
-  
-  dht.begin();
-  Serial.begin(9600);
-  delay(1000);
-  digitalWrite(31, HIGH);
-  delay(2000);
-  digitalWrite(31, LOW);
+ printdate(now);
+ 
+ if(chan_by_prog_on(now, 0)) {
+   digitalWrite(relais, HIGH);
+   Serial.println("  Relais ON ");
+ }
+ else {
+   digitalWrite(relais, LOW);
+   Serial.println("  Relais OFF");
+ }
 }
 
 void loop() {
-  webserver.processConnection();
-     
-  Serial.print("prog: ");
-  Serial.print(prog);
-  Serial.println();
-
-  ledprog();
+  checkprog();
+  delay(1000);
 }
-

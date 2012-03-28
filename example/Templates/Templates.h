@@ -1,25 +1,34 @@
-P(index_title_1) = "Temperatur";
+P(list_content_2) = "<ul>";
+P(list_content_5) = "</ul>";
+P(list_content_1) = "<p>PIN List:</p>";
 P(base_content_left) = 
-  "</title>"
-  "</head>"
+  "<html>"
   "<body>";
 P(base_content_right) = 
-  "<hr>"
-  "<p>powered by TemplateDuino and Webduino</p>"
   "</body>"
   "</html>";
-P(base_title_left) = 
-  "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">"
-  "<html xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"de-de\" lang=\"de-de\" dir=\"ltr\">"
-  "<head><title>";
 P(index_content_4) = "</ul>";
 P(index_content_1) = "<ul>";
 
+void tpl_list(WebServer &server, DATA_list data) {
+  server.printP(base_content_left);
+
+  server.printP(list_content_1);
+
+  server.printP(list_content_2);
+
+  for(int i = 0; i < (sizeof(data.pins) / sizeof(DATA_PinList)); i++) {
+    server << "<li>" << data.pins[i].name << ": " << data.pins[i].value << "</li>" << endl;
+
+  }
+  server.printP(list_content_5);
+
+  server.printP(base_content_right);
+
+}
+
+
 void tpl_index(WebServer &server, DATA_index data) {
-  server.printP(base_title_left);
-
-  server.printP(index_title_1);
-
   server.printP(base_content_left);
 
   server.printP(index_content_1);
